@@ -1,5 +1,6 @@
 package plc.project;
 
+import javax.swing.text.html.Option;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -50,8 +51,8 @@ public final class Parser {
      * next tokens start a field, aka {@code LET}.
      */
     public Ast.Field parseField() throws ParseException {
-        Ast.Stmt.Declaration dec = parseDeclarationStatement();
-        return new Ast.Field(dec.getName(), dec.getValue());
+        Ast.Stmt.Declaration dec = parseDeclare(true);
+        return new Ast.Field(dec.getName(), dec.getTypeName().get(), dec.getValue());
     }
 
     /**
@@ -61,35 +62,51 @@ public final class Parser {
     public Ast.Method parseMethod() throws ParseException {
         String name = tokens.get(0).getLiteral();
         List<String> parameters = new ArrayList<>();
+        List<String> parameterTypes = new ArrayList<>();
         List<Ast.Stmt> statements = new ArrayList<>();
+        Optional<String> returnType = Optional.empty();
+        // Method name
         if (!match(Token.Type.IDENTIFIER)) {
             throw new ParseException("Missing an identifier in method", tokens.getErrorIndex());
         }
+        // Open parethesis
         if (!match("(")) {
             throw new ParseException("Missing open parenthesis", tokens.getErrorIndex());
         }
+        // Parameters
         if (peek(Token.Type.IDENTIFIER)) {
             parameters.add(tokens.get(0).getLiteral());
             tokens.advance();
+            // Type
+            parameterTypes.add(parseType(true));
+            // Additional parameters
             while (match(",")) {
+                // Param name
                 if (!peek(Token.Type.IDENTIFIER)) {
                     throw new ParseException("Expected identifier", tokens.getErrorIndex());
                 }
                 parameters.add(tokens.get(0).getLiteral());
                 tokens.advance();
+                // Param type
+                parameterTypes.add(parseType(true));
             }
         }
+        // Closing parenthesis
         if (!match(")")) {
             throw new ParseException("Missing ending parenthesis", tokens.getErrorIndex());
         }
+        // Return type
+        returnType = Optional.of(parseType(false));
+        // Verify do
         if (!match("DO")) {
             throw new ParseException("Missing DO", tokens.getErrorIndex());
         }
+        // Statements
         while (!match("END")) {
             Ast.Stmt statement = parseStatement();
             statements.add(statement);
         }
-        return new Ast.Method(name, parameters, statements);
+        return new Ast.Method(name, parameters, parameterTypes, returnType, statements);
     }
 
     /**
@@ -149,14 +166,23 @@ public final class Parser {
      * statement, aka {@code LET}.
      */
     public Ast.Stmt.Declaration parseDeclarationStatement() throws ParseException {
+        return parseDeclare(false);
+    }
+
+    public Ast.Stmt.Declaration parseDeclare(boolean requireColon) throws ParseException {
         String name;
         Optional<Ast.Expr> value = Optional.empty();
+        Optional<String> type = Optional.empty();
+
         // Declared variable
         if (!peek(Token.Type.IDENTIFIER)) {
             throw new ParseException("Expected an identifier", tokens.getErrorIndex());
         }
         name = tokens.get(0).getLiteral();
         tokens.advance();
+        // Type name
+        String tempType = parseType(requireColon);
+        type = tempType == null ? Optional.empty() : Optional.of(tempType);
         // Initialization
         if (match("=")) {
             Ast.Expr optionalExpr = parseExpression();
@@ -169,7 +195,7 @@ public final class Parser {
         if (!match(";")) {
             throw new ParseException("Missing semicolon after declaration", tokens.getErrorIndex());
         }
-        return new Ast.Stmt.Declaration(name, value);
+        return new Ast.Stmt.Declaration(name, type, value);
     }
 
     /**
@@ -455,6 +481,30 @@ public final class Parser {
             throw new ParseException("Missing ending parenthesis", tokens.getErrorIndex());
         }
         return new Ast.Expr.Group(expression);
+    }
+
+    public String parseType(boolean required) throws ParseException {
+        String type = null;
+        if (required) {
+            if (!match(":")) {
+                throw new ParseException("Missing semicolon", tokens.getErrorIndex());
+            }
+            if (!peek(Token.Type.IDENTIFIER)) {
+                throw new ParseException("Expected identifier as type", tokens.getErrorIndex());
+            }
+            type = tokens.get(0).getLiteral();
+            tokens.advance();
+        }
+        else {
+            if (match(":")) {
+                if (!peek(Token.Type.IDENTIFIER)) {
+                    throw new ParseException("Expected an identifer as type", tokens.getErrorIndex());
+                }
+                type = tokens.get(0).getLiteral();
+                tokens.advance();
+            }
+        }
+        return type;
     }
 
     public String replaceEscapes(String str) {
