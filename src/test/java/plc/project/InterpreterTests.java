@@ -302,6 +302,13 @@ final class InterpreterTests {
                         ),
                         false
                 ),
+                Arguments.of("And (Short Circuit)",
+                        new Ast.Expr.Binary("AND",
+                                new Ast.Expr.Literal(false),
+                                new Ast.Expr.Access(Optional.empty(), "undefined")
+                        ),
+                        false
+                ),
                 Arguments.of("Or (Short Circuit)",
                         new Ast.Expr.Binary("OR",
                                 new Ast.Expr.Literal(true),
@@ -337,6 +344,13 @@ final class InterpreterTests {
                         ),
                         "ab"
                 ),
+                Arguments.of("RHS String",
+                        new Ast.Expr.Binary("+",
+                                new Ast.Expr.Literal(BigInteger.ONE),
+                                new Ast.Expr.Literal("10")
+                        ),
+                        "110"
+                ),
                 Arguments.of("Addition",
                         new Ast.Expr.Binary("+",
                                 new Ast.Expr.Literal(BigInteger.ONE),
@@ -350,6 +364,13 @@ final class InterpreterTests {
                                 new Ast.Expr.Literal(new BigDecimal("3.4"))
                         ),
                         new BigDecimal("0.4")
+                ),
+                Arguments.of("Division by Zero",
+                        new Ast.Expr.Binary("/",
+                                new Ast.Expr.Literal(BigInteger.ONE),
+                                new Ast.Expr.Literal(BigInteger.ZERO)
+                        ),
+                        null
                 ),
                 Arguments.of("Multiple Addition",
                         new Ast.Expr.Binary("+",
@@ -391,14 +412,31 @@ final class InterpreterTests {
     void testFunctionExpression(String test, Ast ast, Object expected) {
         Scope scope = new Scope(null);
         scope.defineFunction("function", 0, args -> Environment.create("function"));
+
         Scope object = new Scope(null);
         object.defineFunction("method", 1, args -> Environment.create("object.method"));
         scope.defineVariable("object", new Environment.PlcObject(object, "object"));
+
+        Scope log = new Scope(null);
+        log.defineFunction("meth", 3, args -> Environment.NIL);
+        scope.defineFunction("log", 1, args -> Environment.NIL);
         test(ast, expected, scope);
     }
 
     private static Stream<Arguments> testFunctionExpression() {
         return Stream.of(
+                // log("object").meth(log(1), log(10))
+                Arguments.of("Execution Order",
+                        new Ast.Expr.Function(
+                                Optional.of(new Ast.Expr.Function(Optional.empty(), "print", Arrays.asList(new Ast.Expr.Literal("object")))),
+                                "meth",
+                                Arrays.asList(
+                                        new Ast.Expr.Function(Optional.empty(), "print", Arrays.asList(new Ast.Expr.Literal(BigInteger.ONE))),
+                                        new Ast.Expr.Function(Optional.empty(), "print", Arrays.asList(new Ast.Expr.Literal(BigInteger.TEN)))
+                                )
+                        ),
+                        Environment.NIL.getValue()
+                ),
                 Arguments.of("Function",
                         new Ast.Expr.Function(Optional.empty(), "function", Arrays.asList()),
                         "function"

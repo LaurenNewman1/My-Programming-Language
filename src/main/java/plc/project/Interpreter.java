@@ -205,17 +205,21 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
             }
             return Environment.create(false);
         }
-        Environment.PlcObject left = visit(ast.getLeft());
-        Environment.PlcObject right = visit(ast.getRight());
         if (ast.getOperator().equals("AND")) {
-            Boolean leftBool = requireType(Boolean.class, left);
-            Boolean rightBool = requireType(Boolean.class, right);
+            Boolean leftBool = requireType(Boolean.class, visit(ast.getLeft()));
+            // Short circuit
+            if (!leftBool) {
+                return Environment.create(false);
+            }
+            Boolean rightBool = requireType(Boolean.class, visit(ast.getRight()));
             if (leftBool && rightBool) {
                 return Environment.create(true);
             }
             return Environment.create(false);
         }
-        else if (ast.getOperator().equals("<") || ast.getOperator().equals(">")
+        Environment.PlcObject left = visit(ast.getLeft());
+        Environment.PlcObject right = visit(ast.getRight());
+        if (ast.getOperator().equals("<") || ast.getOperator().equals(">")
                     || ast.getOperator().equals("<=") || ast.getOperator().equals(">=")) {
             if (!isType(left.getValue().getClass(), right)) {
                 throw new RuntimeException("Attempted to compare different types");
@@ -256,8 +260,8 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
         }
         // Concat
         else if (ast.getOperator().equals("+") && (isType(String.class, left) || isType(String.class, right))) {
-            String leftStr = requireType(String.class, left);
-            String rightStr = requireType(String.class, right);
+            String leftStr = left.getValue().toString();
+            String rightStr = right.getValue().toString();
             return Environment.create(leftStr.concat(rightStr));
         }
         // Arithmetic
@@ -275,6 +279,9 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
                     case "*":
                         return Environment.create(leftVal.multiply(rightVal));
                     case "/":
+                        if (rightVal.equals(BigDecimal.ZERO)) {
+                            throw new RuntimeException("Divide by zero");
+                        }
                         return Environment.create(leftVal.divide(rightVal, 1, RoundingMode.HALF_EVEN));
                 }
             }
@@ -290,6 +297,9 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
                     case "*":
                         return Environment.create(leftVal.multiply(rightVal));
                     case "/":
+                        if (rightVal.equals(BigInteger.ZERO)) {
+                            throw new RuntimeException("Divide by zero");
+                        }
                         return Environment.create(leftVal.divide(rightVal));
                 }
             }
@@ -312,15 +322,20 @@ public class Interpreter implements Ast.Visitor<Environment.PlcObject> {
 
     @Override
     public Environment.PlcObject visit(Ast.Expr.Function ast) {
+        // Has receiver
+        if (ast.getReceiver().isPresent()) {
+            Environment.PlcObject receiver = visit(ast.getReceiver().get());
+            // Arguments
+            List<Environment.PlcObject> args = new ArrayList<>();
+            for (Ast.Expr a : ast.getArguments()) {
+                args.add(visit(a));
+            }
+            return receiver.callMethod(ast.getName(), args);
+        }
         // Arguments
         List<Environment.PlcObject> args = new ArrayList<>();
         for (Ast.Expr a : ast.getArguments()) {
             args.add(visit(a));
-        }
-        // Has receiver
-        if (ast.getReceiver().isPresent()) {
-            Environment.PlcObject receiver = visit(ast.getReceiver().get());
-            return receiver.callMethod(ast.getName(), args);
         }
         // Regular function
         Environment.Function func = scope.lookupFunction(ast.getName(), ast.getArguments().size());
