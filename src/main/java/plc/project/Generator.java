@@ -55,11 +55,13 @@ public final class Generator implements Ast.Visitor<Void> {
         print("System.exit(new Main().main());");
         newline(--indent);
         print("}");
-        newline(--indent); newline(++indent);
+        newline(0);
         for (Ast.Method method : ast.getMethods()) {
+            newline(indent);
             print(method);
-            newline(--indent); newline(indent);
+            newline(0);
         }
+        newline(0);
         print("}");
         return  null;
     }
@@ -86,7 +88,7 @@ public final class Generator implements Ast.Visitor<Void> {
         print(ast.getName(), "(");
         int lastParam = ast.getParameters().size() - 1;
         for (int i = 0; i < lastParam; i++) {
-            Environment.Type type = Environment.getType(ast.getParameters().get(i));
+            Environment.Type type = Environment.getType(ast.getParameterTypeNames().get(i));
             print(type.getJvmName(), " ", ast.getParameters().get(i), ", ");
         }
         // No parameters
@@ -170,7 +172,8 @@ public final class Generator implements Ast.Visitor<Void> {
 
     @Override
     public Void visit(Ast.Stmt.For ast) {
-        print("for (", ast.getValue().getType().getJvmName(), " ", ast.getName(), " : ", ast.getValue(), ") {");
+        String type = getTypeFromIterable(ast.getValue().getType()).getJvmName();
+        print("for (", type, " ", ast.getName(), " : ", ast.getValue(), ") {");
         if (!ast.getStatements().isEmpty()) {
             newline(++indent);
             for (int i = 0; i < ast.getStatements().size(); i++) {
@@ -187,7 +190,7 @@ public final class Generator implements Ast.Visitor<Void> {
 
     @Override
     public Void visit(Ast.Stmt.While ast) {
-        print("white (", ast.getCondition(), ") {");
+        print("while (", ast.getCondition(), ") {");
         if (!ast.getStatements().isEmpty()) {
             newline(++indent);
             for (int i = 0; i < ast.getStatements().size(); i++) {
@@ -263,7 +266,7 @@ public final class Generator implements Ast.Visitor<Void> {
         }
         // No parameters
         if (lastArg == -1) {
-            print(") {");
+            print(")");
         }
         else {
             print(ast.getArguments().get(lastArg), ")");
@@ -271,4 +274,10 @@ public final class Generator implements Ast.Visitor<Void> {
         return null;
     }
 
+    public Environment.Type getTypeFromIterable(Environment.Type iterable) {
+        int typeStart = iterable.getJvmName().indexOf('<');
+        int typeEnd = iterable.getJvmName().indexOf('>');
+        String typeStr = iterable.getJvmName().substring(typeStart + 1, typeEnd);
+        return Environment.getType(typeStr);
+    }
 }

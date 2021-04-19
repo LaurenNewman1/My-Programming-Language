@@ -34,10 +34,10 @@ public final class Parser {
     public Ast.Source parseSource() throws ParseException {
         List<Ast.Field> fields = new ArrayList<>();
         List<Ast.Method> methods = new ArrayList<>();
-        while(match("LET")) {
+        while(peek("LET")) {
             fields.add(parseField());
         }
-        while(match("DEF")) {
+        while(peek("DEF")) {
             methods.add(parseMethod());
         }
         if (tokens.has(0)) {
@@ -51,6 +51,7 @@ public final class Parser {
      * next tokens start a field, aka {@code LET}.
      */
     public Ast.Field parseField() throws ParseException {
+        match("LET");
         Ast.Stmt.Declaration dec = parseDeclare(true);
         return new Ast.Field(dec.getName(), dec.getTypeName().get(), dec.getValue());
     }
@@ -60,6 +61,7 @@ public final class Parser {
      * next tokens start a method, aka {@code DEF}.
      */
     public Ast.Method parseMethod() throws ParseException {
+        match("DEF");
         String name = tokens.get(0).getLiteral();
         List<String> parameters = new ArrayList<>();
         List<String> parameterTypes = new ArrayList<>();
@@ -96,7 +98,10 @@ public final class Parser {
             throw new ParseException("Missing ending parenthesis", tokens.getErrorIndex());
         }
         // Return type
-        returnType = Optional.of(parseType(false));
+        String tempType = parseType(false);
+        if (tempType != null) {
+            returnType = Optional.of(tempType);
+        }
         // Verify do
         if (!match("DO")) {
             throw new ParseException("Missing DO", tokens.getErrorIndex());
