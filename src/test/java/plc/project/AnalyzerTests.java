@@ -25,6 +25,10 @@ public final class AnalyzerTests {
         scope.defineFunction("method", "method", Arrays.asList(Environment.Type.ANY), Environment.Type.INTEGER, args -> Environment.NIL);
     }));
 
+    private static final Environment.Type OBJECT_CHAIN_TYPE = new Environment.Type("ObjectType", "ObjectType", init(new Scope(null), scope -> {
+        scope.defineVariable("b", "b", OBJECT_TYPE, Environment.NIL);
+    }));
+
     @ParameterizedTest(name = "{0}")
     @MethodSource
     public void testFieldStatement(String test, Ast.Stmt.Field ast, Ast.Stmt.Field expected) {
@@ -81,6 +85,21 @@ public final class AnalyzerTests {
      */
     private static Stream<Arguments> testMethod() {
         return Stream.of(
+                Arguments.of("Valid Parameter",
+                        // DEF increment(num: Integer): Integer DO RETURN num + 1; END
+                        new Ast.Method("increment", Arrays.asList("num"), Arrays.asList("Integer"), Optional.of("Integer"), Arrays.asList(
+                                new Ast.Stmt.Return(new Ast.Expr.Binary("+",
+                                        new Ast.Expr.Access(Optional.empty(), "num"),
+                                        new Ast.Expr.Literal(BigInteger.ONE)
+                                ))
+                        )),
+                        init(new Ast.Method("increment", Arrays.asList("num"), Arrays.asList("Integer"), Optional.of("Integer"), Arrays.asList(
+                                new Ast.Stmt.Return(init(new Ast.Expr.Binary("+",
+                                        init(new Ast.Expr.Access(Optional.empty(), "num"), ast -> ast.setVariable(new Environment.Variable("num", "num", Environment.Type.INTEGER, Environment.NIL))),
+                                        init(new Ast.Expr.Literal(BigInteger.ONE), ast -> ast.setType(Environment.Type.INTEGER))
+                                ), ast -> ast.setType(Environment.Type.INTEGER)))
+                        )), ast -> ast.setFunction(new Environment.Function("increment", "increment", Arrays.asList(Environment.Type.INTEGER), Environment.Type.INTEGER, args -> Environment.NIL)))
+                ),
                 Arguments.of("Hello World",
                         // DEF main(): Integer DO print("Hello, World!"); END
                         new Ast.Method("main", Arrays.asList(), Arrays.asList(), Optional.of("Integer"), Arrays.asList(
@@ -293,6 +312,11 @@ public final class AnalyzerTests {
                         // 9223372036854775807
                         new Ast.Expr.Literal(BigInteger.valueOf(Long.MAX_VALUE)),
                         null
+                ),
+                Arguments.of("Integer Invalid Negative",
+                        // -9223372036854775807
+                        new Ast.Expr.Literal(BigInteger.valueOf(Long.MIN_VALUE)),
+                        null
                 )
         );
     }
@@ -300,7 +324,9 @@ public final class AnalyzerTests {
     @ParameterizedTest(name = "{0}")
     @MethodSource
     public void testBinaryExpression(String test, Ast.Expr.Binary ast, Ast.Expr.Binary expected) {
-        test(ast, expected, new Scope(null));
+        test(ast, expected, init(new Scope(null), scope -> {
+            scope.defineVariable("comparable", "comparable", Environment.Type.COMPARABLE, Environment.NIL);
+        }));
     }
 
     private static Stream<Arguments> testBinaryExpression() {
@@ -353,6 +379,17 @@ public final class AnalyzerTests {
                                 new Ast.Expr.Literal(BigDecimal.ONE)
                         ),
                         null
+                ),
+                Arguments.of("Comparable",
+                        // comparable >= comparable
+                        new Ast.Expr.Binary(">=",
+                                new Ast.Expr.Access(Optional.empty(),"comparable"),
+                                new Ast.Expr.Access(Optional.empty(),"comparable")
+                        ),
+                        init(new Ast.Expr.Binary(">=",
+                                init(new Ast.Expr.Access(Optional.empty(),"comparable"), ast -> ast.setVariable(new Environment.Variable("comparable", "comparable", Environment.Type.COMPARABLE, Environment.NIL))),
+                                init(new Ast.Expr.Access(Optional.empty(),"comparable"), ast -> ast.setVariable(new Environment.Variable("comparable", "comparable", Environment.Type.COMPARABLE, Environment.NIL)))
+                        ), ast -> ast.setType(Environment.Type.BOOLEAN))
                 )
         );
     }
@@ -363,11 +400,27 @@ public final class AnalyzerTests {
         test(ast, expected, init(new Scope(null), scope -> {
             scope.defineVariable("variable", "variable", Environment.Type.INTEGER, Environment.NIL);
             scope.defineVariable("object", "object", OBJECT_TYPE, Environment.NIL);
+            scope.defineVariable("a", "a", OBJECT_CHAIN_TYPE, Environment.NIL);
         }));
     }
 
     private static Stream<Arguments> testAccessExpression() {
         return Stream.of(
+                Arguments.of("Field Chain",
+                        // a.b.field
+                        new Ast.Expr.Access(Optional.of(
+                                new Ast.Expr.Access(Optional.of(
+                                        new Ast.Expr.Access(Optional.empty(), "a")),
+                                        "b")
+                        ), "field"),
+                        init(new Ast.Expr.Access(Optional.of(
+                                init(
+                                        new Ast.Expr.Access(
+                                                Optional.of(init(new Ast.Expr.Access(Optional.empty(), "a"), ast -> ast.setVariable(new Environment.Variable("a", "a", OBJECT_CHAIN_TYPE, Environment.NIL)))),
+                                                "b"
+                                        ), ast -> ast.setVariable(new Environment.Variable("b", "b", OBJECT_TYPE, Environment.NIL)))
+                        ), "field"), ast -> ast.setVariable(new Environment.Variable("field", "field", Environment.Type.INTEGER, Environment.NIL)))
+                ),
                 Arguments.of("Variable",
                         // variable
                         new Ast.Expr.Access(Optional.empty(), "variable"),

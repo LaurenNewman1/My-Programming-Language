@@ -60,8 +60,10 @@ public final class Analyzer implements Ast.Visitor<Void> {
         }
         // Parameters
         List<Environment.Type> parameterTypes = new ArrayList<>();
-        for (String typeName : ast.getParameterTypeNames()) {
-            parameterTypes.add(Environment.getType(typeName));
+        for (int i = 0; i < ast.getParameters().size(); i++) {
+            Environment.Type type = Environment.getType(ast.getParameterTypeNames().get(i));
+            scope.defineVariable(ast.getParameters().get(i), ast.getParameters().get(i), type, Environment.NIL);
+            parameterTypes.add(type);
         }
         // Define & Set Function
         scope.defineFunction(ast.getName(), ast.getName(), parameterTypes,
@@ -230,6 +232,9 @@ public final class Analyzer implements Ast.Visitor<Void> {
             if (((BigInteger) ast.getLiteral()).compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) > 0) {
                 throw new RuntimeException("BigInteger value out of bounds");
             }
+            else if (((BigInteger) ast.getLiteral()).compareTo(BigInteger.valueOf(Integer.MIN_VALUE)) < 0) {
+                throw new RuntimeException("BigInteger value out of bounds");
+            }
             ast.setType(Environment.Type.INTEGER);
         }
         // Decimal
@@ -295,11 +300,24 @@ public final class Analyzer implements Ast.Visitor<Void> {
 
     @Override
     public Void visit(Ast.Expr.Access ast) {
+        // Has Receiver
         if (ast.getReceiver().isPresent()) {
             visit(ast.getReceiver().get());
-            Environment.Variable receiver = scope.lookupVariable(((Ast.Expr.Access)ast.getReceiver().get()).getName());
-            ast.setVariable(receiver.getType().getField(ast.getName()));
+            Ast.Expr.Access expr = ast;
+            List<String> chain = new ArrayList<>();
+            // Get outermost receiver
+            while(expr.getReceiver().isPresent()) {
+                chain.add(expr.getName());
+                expr = (Ast.Expr.Access)expr.getReceiver().get();
+            }
+            // Chain inwards to get field
+            Environment.Variable receiver = scope.lookupVariable(expr.getName());
+            for(int i = chain.size() - 1; i > -1; i--) {
+                receiver = receiver.getType().getField(chain.get(i));
+            }
+            ast.setVariable(receiver);
         }
+        // Variable
         else {
             ast.setVariable(scope.lookupVariable(ast.getName()));
         }
@@ -338,7 +356,8 @@ public final class Analyzer implements Ast.Visitor<Void> {
         }
         else if (target.equals(Environment.Type.COMPARABLE)) {
             if (!type.equals(Environment.Type.INTEGER) && !type.equals(Environment.Type.DECIMAL) &&
-                !type.equals(Environment.Type.CHARACTER) && !type.equals(Environment.Type.STRING)) {
+                !type.equals(Environment.Type.CHARACTER) && !type.equals(Environment.Type.STRING) &&
+                !type.equals(Environment.Type.COMPARABLE)) {
                 throw new RuntimeException("Error: Not comparable");
             }
         }

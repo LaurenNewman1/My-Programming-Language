@@ -24,8 +24,10 @@ plc/project/Ast.java
 plc/project/Token.java
  plc.project.Token
  plc.project.Token$Type
-plc/project/Analyzer.java
- plc.project.Analyzer
+plc/project/Parser.java
+ plc.project.Parser
+ plc.project.Parser$1
+ plc.project.Parser$TokenStream
 plc/homework/Regex.java
  plc.homework.Regex
 plc/project/Interpreter.java
@@ -45,7 +47,5 @@ plc/project/Environment.java
  plc.project.Environment$Variable
 plc/project/Generator.java
  plc.project.Generator
-plc/project/Parser.java
- plc.project.Parser
- plc.project.Parser$1
- plc.project.Parser$TokenStream
+plc/project/Analyzer.java
+ plc.project.Analyzer
