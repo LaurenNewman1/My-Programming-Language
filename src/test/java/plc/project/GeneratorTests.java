@@ -5,7 +5,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import javax.swing.text.html.Option;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.math.BigDecimal;
@@ -196,6 +195,59 @@ public class GeneratorTests {
 
     private static Stream<Arguments> testMethod() {
         return Stream.of(
+                Arguments.of("Nested Statements",
+                        // DEF printOdds(list: IntegerIterable) DO
+                        //    FOR num IN list DO
+                        //        IF num != 1 DO
+                        //            print(num);
+                        //        END
+                        //    END
+                        // END
+                        init(new Ast.Expr.Method(
+                                "printOdds",
+                                Arrays.asList("list"),
+                                Arrays.asList("IntegerIterable"),
+                                Optional.empty(),
+                                Arrays.asList(
+                                        new Ast.Stmt.For(
+                                                "num",
+                                                init(new Ast.Expr.Access(Optional.empty(), "list"), ast -> ast.setVariable(new Environment.Variable("list", "list", Environment.Type.INTEGER_ITERABLE, Environment.NIL))),
+                                                Arrays.asList(
+                                                        new Ast.Stmt.If(
+                                                                init(new Ast.Expr.Binary(
+                                                                        "!=",
+                                                                        init(new Ast.Expr.Access(Optional.empty(), "num"), ast -> ast.setVariable(new Environment.Variable("num", "num", Environment.Type.INTEGER, Environment.NIL))),
+                                                                        init(new Ast.Expr.Literal(BigInteger.ONE), ast -> ast.setType(Environment.Type.INTEGER))
+                                                                ), ast -> ast.setType(Environment.Type.BOOLEAN)),
+                                                                Arrays.asList(
+                                                                        new Ast.Stmt.Expression(
+                                                                                init(new Ast.Expr.Function(Optional.empty(), "print", Arrays.asList(
+                                                                                        init(new Ast.Expr.Access(Optional.empty(), "num"), ast -> ast.setVariable(new Environment.Variable("num", "num", Environment.Type.INTEGER, Environment.NIL)))
+                                                                                )), ast -> ast.setFunction(new Environment.Function("print", "System.out.print", Arrays.asList(Environment.Type.INTEGER), Environment.Type.NIL, args -> Environment.NIL)))
+                                                                        )
+                                                                ),
+                                                                Arrays.asList()
+                                                        )
+                                                )
+                                        )
+                                )
+                        ), ast -> ast.setFunction(new Environment.Function("printOdds", "printOdds", Arrays.asList(Environment.Type.INTEGER_ITERABLE), Environment.Type.NIL, args -> Environment.NIL))),
+                        String.join(System.lineSeparator(),
+                                "void printOdds(Iterable<Integer> list) {",
+                                "    for (int num : list) {",
+                                "        if (num != 1) {",
+                                "            System.out.print(num);",
+                                "        }",
+                                "    }",
+                                "}"
+                        )
+                ),
+
+
+
+
+
+
                 Arguments.of("Multiple Statements",
                         // DEF func(x: Integer, y: Decimal, z: String) DO
                         //     print(x);
@@ -238,7 +290,7 @@ public class GeneratorTests {
                                 )
                         ), ast -> ast.setFunction(new Environment.Function("func", "func", Arrays.asList(Environment.Type.INTEGER, Environment.Type.DECIMAL, Environment.Type.STRING), Environment.Type.NIL, args -> Environment.NIL))),
                         String.join(System.lineSeparator(),
-                                "func(int x, double y, String z) {",
+                                "void func(int x, double y, String z) {",
                                 "    print(x);",
                                 "    print(y);",
                                 "    print(z);",
@@ -262,6 +314,14 @@ public class GeneratorTests {
                                 "}"
                         )
                 )
+
+
+
+
+
+
+
+
         );
     }
 
@@ -401,6 +461,22 @@ public class GeneratorTests {
                                 init(new Ast.Expr.Literal(BigInteger.TEN), ast -> ast.setType(Environment.Type.INTEGER))
                         ), ast -> ast.setType(Environment.Type.STRING)),
                         "\"Ben\" + 10"
+                )
+        );
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource
+    void testLiteralExpression(String test, Ast.Expr.Literal ast, String expected) {
+        test(ast, expected);
+    }
+
+    private static Stream<Arguments> testLiteralExpression() {
+        return Stream.of(
+                Arguments.of("Nil",
+                        // Nil
+                        init(new Ast.Expr.Literal(Environment.NIL), ast -> ast.setType(Environment.Type.NIL)),
+                        "NIL"
                 )
         );
     }

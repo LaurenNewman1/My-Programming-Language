@@ -30,13 +30,6 @@ public final class Generator implements Ast.Visitor<Void> {
 
     @Override
     public Void visit(Ast.Source ast) {
-        // create a "class Main{"
-        //      declare fields
-        //      declare "public static void main(String[] args) {
-        //                      System.exit(main());
-        //               }
-        //      declare each of our methods
-        //      one of our methods is called main!
         print("public class Main {");
         newline(indent);
         if (!ast.getFields().isEmpty()) {
@@ -83,6 +76,9 @@ public final class Generator implements Ast.Visitor<Void> {
         if (ast.getReturnTypeName().isPresent()) {
             Environment.Type type = Environment.getType(ast.getReturnTypeName().get());
             print(type.getJvmName(), " ");
+        }
+        else {
+            print("void ");
         }
         // Parameters
         print(ast.getName(), "(");
@@ -213,7 +209,10 @@ public final class Generator implements Ast.Visitor<Void> {
 
     @Override
     public Void visit(Ast.Expr.Literal ast) {
-        if (ast.getType().equals(Environment.Type.CHARACTER)) {
+        if (ast.getType().equals(Environment.Type.NIL)) {
+            print("NIL");
+        }
+        else if (ast.getType().equals(Environment.Type.CHARACTER)) {
             print("'", ast.getLiteral(), "'");
         }
         else if (ast.getType().equals(Environment.Type.STRING)) {
